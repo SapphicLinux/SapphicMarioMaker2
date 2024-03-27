@@ -82,7 +82,7 @@ for d in "${target[@]}";do
   build_path="${cache_dir}/${d}"
 
   requires_sudo=""
-  source "${bp_path}/config"
+  [ -f "${bp_path}/config" ] && source "${bp_path}/config"
 
   grep -q 'sudo' "${bp_path}/install.sh" && [ "${requires_sudo}" != "0" ] && sudo_check=0
 
