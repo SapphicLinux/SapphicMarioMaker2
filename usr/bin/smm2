@@ -1,0 +1,101 @@
+#!/bin/bash
+
+config_dir="$HOME/.config/smm2"
+bp_dir="${config_dir}/blueprints" && mkdir -p "$bp_dir"
+cache_dir="$HOME/.cache/smm2" && mkdir -p "$cache_dir"
+
+#parse flags
+while getopts 'uhYy' flag; do
+  case "${flag}" in
+    [Yy] )  proceed="YES";;
+    [u] )   option_useronly=1;;
+    * )     echo "usage coming soon"; exit 1 ;;
+  esac
+done
+shift $((OPTIND-1))
+
+echo "Warning!"
+echo "This process might take a long time!"
+echo "This program has the potential to be VERY dangerous!"
+echo "Please be sure you know what the scripts in ~/.config/smm2/blueprints/ do"
+echo "You are solely responsible for any issues you may experience!"
+while [ "$proceed" != "YES" ];do
+  read -p "type 'yes' in all caps to proceed: " proceed
+done
+
+#parse args
+if [[ $# -eq 0 ]];then
+  target=($(ls ${bp_dir}))
+else
+  target=()
+  for a in $@;do
+    target+=("${a}")
+  done
+fi
+
+#validate blueprints
+echo "checking configuration..."
+for d in "${target[@]}";do
+  bp_path="${bp_dir}/${d}"
+  if [ -d "${bp_path}" ];then
+    echo "~/.config/smm2/blueprints/${d} exists, continuing"
+  else
+    echo "ERROR: ~/.config/smm2/blueprints/${d} does not exist or is not a directory, aborting"
+    exit 1
+  fi
+  if [ -f "${bp_path}/install.sh" ];then
+    echo "${d}/install.sh exists, continuing"
+  else
+    echo "ERROR: ${d}/install.sh does not exist or is not a file, aborting"
+    exit 1
+  fi
+done
+
+#check dependencies before attempting to build
+for d in "${target[@]}";do
+  bp_path="${bp_dir}/${d}"
+  if [ -f "${bp_path}/deps" ]; then
+    dpkg-query -W --showformat='${db:Status-Status}\n' $(cat ${bp_path}/deps) 2>&1 | grep -v "^installed$";depsfulfilled="$?"
+    if [[ "${depsfulfilled}" -eq 0 ]];then
+      echo "One or more dependency is missing."
+      while true;do
+        read -p "Attempt to install them now? (y/N) " installdeps
+        case "${installdeps}" in
+          [Yy] )
+            installdeps=y;
+            check_root=$(sudo whoami)
+            [ "$check_root" != "root" ] && echo "unable to achieve root privileges" && exit 1
+            break;;
+          [Nn] )
+            exit 1;;
+        esac
+      done
+      sudo apt-get install $(cat "${bp_path}/deps")
+    fi
+  fi
+done
+
+#build package
+for d in "${target[@]}";do
+
+  bp_path="${bp_dir}/${d}"
+  build_path="${cache_dir}/${d}"
+
+  requires_sudo=""
+  source "${bp_path}/config"
+
+  grep -q 'sudo' "${bp_path}/install.sh" && [ "${requires_sudo}" != "0" ] && sudo_check=0
+
+  if [ "$sudo_check" = "0" ] || [ "${requires_sudo}" = "1" ]; then
+    [ "$option_useronly" = "1" ] && echo "ignoring sudo installs" && break
+    check_root=$(sudo whoami)
+    [ "$check_root" != "root" ] && echo "unable to achieve root privileges" && break
+  fi
+
+  mkdir -p "${build_path}"
+  cd "${build_path}"
+  "${bp_path}/install.sh"
+  cd "${cache_dir}"
+  rm -rf "${build_path}"
+
+done

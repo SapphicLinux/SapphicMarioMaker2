@@ -1,0 +1,17 @@
+Source: sapphicmariomaker2
+Section: development
+Priority: optional
+Maintainer: Penelope Gwen <support@pogmom.me>
+Rules-Requires-Root: no
+Build-Depends:
+ debhelper-compat (= 13),
+Standards-Version: 4.6.2
+Homepage: 
+
+Package: sapphicmariomaker2
+Architecture: all
+Multi-Arch: foreign
+Depends:
+ ${misc:Depends}, sudo, apt, dpkg
+Description: Compile multiple source code packages from a single command
+ Insert long description, indented with spaces.
